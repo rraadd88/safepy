@@ -28,7 +28,12 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def load_network_from_txt(filename, layout='spring_embedded', node_key_attribute='key', verbose=True):
+def load_network_from_txt(
+    filename,
+    layout,#='spring_embedded',
+    node_key_attribute='key', 
+    verbose=True,
+    ):
     """
     Loads network from tab-delimited text file and applies a network layout.
 
@@ -269,14 +274,18 @@ def load_network_from_cys(filename, view_name=None, verbose=True):
     return G
 
 
-def load_network_from_scatter(filename, node_key_attribute='key', verbose=True):
+def load_network_from_scatter(
+    filename,
+    node_key_attribute='key',
+    verbose=True
+    ):
     filename = re.sub('~', expanduser('~'), filename)
 
     if verbose:
         print('Loading the file of node coordinates...')
 
     scatter = pd.read_csv(filename, sep='\t')
-    scatter.columns = ['key', 'x', 'y', 'label']
+    scatter.columns = [node_key_attribute, 'x', 'y', 'label']
 
     list_of_tuples = [(x, y) for x, y in scatter.T.to_dict().items()]
 
@@ -286,21 +295,38 @@ def load_network_from_scatter(filename, node_key_attribute='key', verbose=True):
     return G
 
 
-def apply_network_layout(G, layout='kamada_kawai', verbose=True):
+def apply_network_layout(
+    G,
+    layout='kamada_kawai',
+    k=0.2,
+    iterations=100,
+    random_state=0,
+    verbose=True,
+    **kws_layout, 
+    ):
 
     if layout == 'kamada_kawai':
 
         if verbose:
             logging.info('Applying the Kamada-Kawai network layout... (may take several minutes)')
 
-        pos = nx.kamada_kawai_layout(G)
+        pos = nx.kamada_kawai_layout(
+            G,
+            **kws_layout, 
+        )
 
     elif layout == 'spring_embedded':
 
         if verbose:
-            logging.info('Applying the spring-embedded network layout... (may take several minutes)')
+            logging.info('Applying the spring-embedded network layout... (may take several minutes).')
 
-        pos = nx.spring_layout(G, k=0.2, iterations=100)
+        pos = nx.spring_layout(
+            G,
+            k=k, # Increase this value to move nodes farther apart.
+            iterations=iterations, # The iteration stops if the error is below this threshold.
+            seed=random_state,
+            **kws_layout, 
+            )
 
     for n in G:
         G.nodes[n]['x'] = pos[n][0]
@@ -431,15 +457,16 @@ def read_attributes(attribute_file='', node_label_order=None, mask_duplicates=Fa
     return attributes, node_label_order, node2attribute
 
 
-def plot_network(G,
-                 ax=None,
-                 foreground_color='#ffffff',
-                 background_color='#000000',
-                 random_sampling_edges_min=30000,
-                 title='Network',
-                 node_size=10,
-                 alpha=0.2
-                 ):
+def plot_network(
+    G,
+    ax=None,
+    foreground_color='#ffffff',
+    background_color='#000000',
+    random_sampling_edges_min=30000,
+    title='Network',
+    node_size=10,
+    alpha=0.2
+    ):
     """
     Plot/draw a network.
     
@@ -460,10 +487,11 @@ def plot_network(G,
 
     # Randomly sample a fraction of the edges (when network is too big)
     edges = tuple(G.edges())
-    if len(edges) >= random_sampling_edges_min:
-        logging.warning(f"Edges are randomly sampled because the network (edges={len(edges)}) is too \
-        big (random_sampling_edges_min={random_sampling_edges_min}).")
-        edges = random.sample(edges, int(len(edges)*0.1))
+    if random_sampling_edges_min is not None:
+        if len(edges) >= random_sampling_edges_min:
+            logging.warning(f"Edges are randomly sampled because the network (edges={len(edges)})\nis too big (random_sampling_edges_min={random_sampling_edges_min}).")
+            logging.warning(f"To disable random sampling set random_sampling_edges_min=None.")
+            edges = random.sample(edges, int(len(edges)*0.1))
 
     nx.draw(G, ax=ax, pos=node_xy, edgelist=edges,
             node_color=foreground_color, edge_color=foreground_color, node_size=node_size, width=1, alpha=alpha)
@@ -487,8 +515,14 @@ def plot_network(G,
     return ax
 
 
-def plot_network_contour(graph, ax, background_color='#000000'):
+def plot_network_contour(
+    graph,
+    ax = None,
+    background_color='#000000'
+    ):
 
+    if ax is None:
+        ax = plt.gca()  # get current axes i.e. subplot
     foreground_color = '#ffffff'
     if background_color == '#ffffff':
         foreground_color = '#000000'
@@ -587,17 +621,18 @@ def plot_costanzo2016_network_annotations(graph,
             logging.info('%d -- %s' % (n_process+1, process))
 
 
-def mark_nodes(x, y,
-               kind: list,
-               ax=None,
-               foreground_color='#ffffff',
-               background_color='#000000',
-               labels=None,  # subset the nodes by labels
-               label_va='center',
-               legend_label: str = None,
-               test=False,
-               **kws,
-               ):
+def mark_nodes(
+   x, y,
+   kind: list,
+   ax=None,
+   foreground_color='#ffffff',
+   background_color='#000000',
+   labels=None,  # subset the nodes by labels
+   label_va='center',
+   legend_label: str = None,
+   test=False,
+   **kws,
+   ):
     """
     Show nodes.
 
